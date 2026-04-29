@@ -1,5 +1,5 @@
 # ====================================================================
-# SOPTEC - Core Administrativo
+# Core Administrativo
 # Arquitectura: Menús Anidados y Consultas CIM/WMI
 # ====================================================================
 
@@ -159,7 +159,7 @@ function Invoke-SubModuloDiagnostico {
                     Get-EventLog -LogName Security -InstanceId 4624 -Newest 5 -ErrorAction Stop | Select-Object TimeGenerated, Message | Format-Table -AutoSize | Out-String | Write-Host -ForegroundColor White
                 }
                 catch {
-                    Write-Host "Acceso denegado. Necesitas ejecutar Soptec como Administrador para ver auditorías." -ForegroundColor Red
+                    Write-Host "Acceso denegado. Necesitas ejecutar el programa como Administrador para ver auditorías." -ForegroundColor Red
                 }
                 Wait-UserKeyPress
             }
@@ -188,7 +188,7 @@ while ($appCorriendo) {
         
         { $_ -in 'S', [char]27 } { 
             Clear-Host
-            Write-Host "Cerrando SOPTEC. ¡Buen trabajo!" -ForegroundColor Green
+            Write-Host "Cerrando programa." -ForegroundColor Green
             $appCorriendo = $false 
         }
     }
