@@ -1,28 +1,39 @@
 # ====================================================================
-# Core Administrativo
+# SOPTEC - Core Administrativo
 # Arquitectura: Menús Anidados y Consultas CIM/WMI
+# Autor: Manuel Rodriguez | GOLSYSTEMS
 # ====================================================================
 
 # --------------------------------------------------------------------
-# COMPONENTES DE UI (DRY Principle)
+# CONFIGURACIÓN GLOBAL
+# --------------------------------------------------------------------
+$WorkDirectory = "C:\Golsystems"
+
+# --------------------------------------------------------------------
+# COMPONENTES DE SEGURIDAD Y ENTORNO
 # --------------------------------------------------------------------
 
-$WorkDirectory = "C:\Golsystems"
+
 
 function Test-IsAdmin {
     $identidad = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = [Security.Principal.WindowsPrincipal]::new($identidad)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
+
 function Initialize-Workspace {
-    # Test-Path verifica si la carpeta existe. Si no (-not), la crea.
     if (-not (Test-Path -Path $WorkDirectory)) {
         Write-Host "[i] Inicializando entorno: Creando directorio $WorkDirectory..." -ForegroundColor DarkGray
         New-Item -ItemType Directory -Path $WorkDirectory -Force | Out-Null
     }
 }
+
+# --------------------------------------------------------------------
+# COMPONENTES DE UI (DRY Principle)
+# --------------------------------------------------------------------
 function Show-Banner {
     Clear-Host
+    # ¡ADVERTENCIA! No pongas espacios antes del @' ni del '@ final
     $bannerASCII = @'
 ========================================================================================================================
    █████████     ███████    ████   █████████  █████ █████  █████████  ███████████ ██████████ ██████   ██████  █████████ 
@@ -32,8 +43,8 @@ function Show-Banner {
 ░███    █████░███      ░███ ░███  ░░░░░░░░███   ░░███     ░░░░░░░░███    ░███     ░███░░█    ░███ ░░░  ░███  ░░░░░░░░███
 ░░███  ░░███ ░░███     ███  ░███  ███    ░███    ░███     ███    ░███    ░███     ░███ ░   █ ░███      ░███  ███    ░███
  ░░█████████  ░░░███████░   █████░░█████████     █████   ░░█████████     █████    ██████████ █████     █████░░█████████ 
-  ░░░░░░░░░     ░░░░░░░    ░░░░░  ░░░░░░░░░     ░░░░░     ░░░░░░░░░     ░░░░░    ░░░░░░░░░░ ░░░░░     ░░░░░  ░░░░░░░░░                                                                                                                   
-=========================================================================================================================
+  ░░░░░░░░░     ░░░░░░░    ░░░░░  ░░░░░░░░░     ░░░░░     ░░░░░░░░░     ░░░░░    ░░░░░░░░░░ ░░░░░     ░░░░░  ░░░░░░░░░ 
+========================================================================================================================
 '@
     Write-Host $bannerASCII -ForegroundColor Cyan
     Write-Host " SISTEMAS   -   GOLSYSTEMS " -BackgroundColor Cyan -ForegroundColor Black
@@ -66,7 +77,6 @@ function Show-SubMenuDiagnostico {
     Write-Host "MENU > 1. DIAGNOSTICO E INFO DE SISTEMA" -ForegroundColor Cyan
     Write-Host "------------------------------------------------------------------------" -ForegroundColor DarkGray
     
-    # Recreando los colores de tu imagen
     Write-Host "  1. " -ForegroundColor Cyan -NoNewline; Write-Host "Resumen de Sistema " -ForegroundColor Yellow -NoNewline; Write-Host " (Hardware, Alerta Disco, Uptime)" -ForegroundColor DarkGray
     Write-Host "  2. " -ForegroundColor Cyan -NoNewline; Write-Host "Estado de Licencia Windows " -ForegroundColor Yellow -NoNewline; Write-Host " (Activacion real)" -ForegroundColor DarkGray
     Write-Host "  3. " -ForegroundColor Cyan -NoNewline; Write-Host "Ver Ultimos Pantallazos Azules " -ForegroundColor Yellow -NoNewline; Write-Host " (BSOD)" -ForegroundColor DarkGray
@@ -111,7 +121,7 @@ function Show-SubMenuImpresoras {
 }
 
 # --------------------------------------------------------------------
-# LÓGICA DE NEGOCIO (Las Funcionalidades Reales)
+# LÓGICA DE NEGOCIO Y CONTROLADORES
 # --------------------------------------------------------------------
 function Wait-UserKeyPress {
     Write-Host "`n[ Presiona cualquier tecla para continuar... ]" -ForegroundColor DarkGray
@@ -142,14 +152,12 @@ function Invoke-SubModuloDiagnostico {
                 Clear-Host; Show-Banner
                 Write-Host "--- LICENCIA DE WINDOWS ---" -ForegroundColor Cyan
                 Write-Host "Consultando servidor de licencias KMS/Retail..." -ForegroundColor DarkGray
-                # Usamos slmgr por debajo para el estatus real
                 cscript /nologo c:\windows\system32\slmgr.vbs /dli | Write-Host -ForegroundColor White
                 Wait-UserKeyPress
             }
             '3' {
                 Clear-Host; Show-Banner
                 Write-Host "--- ÚLTIMOS PANTALLAZOS AZULES (BSOD) ---" -ForegroundColor Cyan
-                # Event ID 1001 suele ser BugCheck (BSOD)
                 $bsods = Get-EventLog -LogName System -Source "BugCheck" -Newest 5 -ErrorAction SilentlyContinue
                 if ($bsods) {
                     $bsods | Format-Table TimeGenerated, Message -AutoSize | Out-String | Write-Host -ForegroundColor Red
@@ -162,33 +170,43 @@ function Invoke-SubModuloDiagnostico {
             '4' {
                 Clear-Host; Show-Banner
                 Write-Host "--- SALUD Y TIPO DE DISCOS ---" -ForegroundColor Cyan
-                # Requiere permisos de Admin para mostrar algunos datos, pero funciona a nivel básico sin ellos
                 Get-PhysicalDisk | Select-Object DeviceId, MediaType, OperationalStatus, @{Name = "Tamaño(GB)"; Expression = { [math]::Round($_.Size / 1GB, 2) } } | Format-Table -AutoSize | Out-String | Write-Host -ForegroundColor White
                 Wait-UserKeyPress
             }
             '5' {
                 Clear-Host; Show-Banner
                 Write-Host "--- REPORTE DE BATERÍA ---" -ForegroundColor Cyan
-                $ruta = "$WorkDirectory\BatteryReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
+                $ruta = Join-Path -Path $WorkDirectory -ChildPath "BatteryReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
                 Write-Host "Generando reporte en: $ruta" -ForegroundColor Yellow
                 powercfg /batteryreport /output $ruta | Out-Null
-                Write-Host "Reporte generado. Abriendo en el navegador..." -ForegroundColor Green
-                Invoke-Item $ruta
+                
+                if (Test-Path -Path $ruta) {
+                    Write-Host "Reporte generado. Abriendo en el navegador..." -ForegroundColor Green
+                    Invoke-Item $ruta
+                }
+                else {
+                    Write-Host "Error: No se pudo generar el reporte." -ForegroundColor Red
+                }
                 Wait-UserKeyPress
             }
             '6' {
                 Clear-Host; Show-Banner
                 Write-Host "--- INVENTARIO DE PC ---" -ForegroundColor Cyan
-                $rutaTxt = "$WorkDirectory\PCInventory_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+                $rutaTxt = Join-Path -Path $WorkDirectory -ChildPath "PCInventory_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
                 Write-Host "Recopilando datos... Esto puede tardar unos segundos." -ForegroundColor Yellow
                 Get-ComputerInfo | Out-File -FilePath $rutaTxt
-                Write-Host "Inventario guardado en: $rutaTxt" -ForegroundColor Green
+                
+                if (Test-Path -Path $rutaTxt) {
+                    Write-Host "Inventario guardado en: $rutaTxt" -ForegroundColor Green
+                }
+                else {
+                    Write-Host "Error al guardar el inventario." -ForegroundColor Red
+                }
                 Wait-UserKeyPress
             }
             '7' {
                 Clear-Host; Show-Banner
                 Write-Host "--- AUDITORÍA LOCAL (Últimos Inicios de Sesión) ---" -ForegroundColor Cyan
-                # Evento 4624 es inicio de sesión exitoso
                 Write-Host "Leyendo registros de seguridad (Requiere permisos de Administrador)..." -ForegroundColor DarkGray
                 try {
                     Get-EventLog -LogName Security -InstanceId 4624 -Newest 5 -ErrorAction Stop | Select-Object TimeGenerated, Message | Format-Table -AutoSize | Out-String | Write-Host -ForegroundColor White
@@ -199,11 +217,12 @@ function Invoke-SubModuloDiagnostico {
                 Wait-UserKeyPress
             }
             'B' { 
-                $enSubMenu = $false # Rompe el bucle interno y regresa al principal
+                $enSubMenu = $false 
             }
         }
     }
 }
+
 
 function Invoke-SubModuloImpresoras {
     $enMenuImpresoras = $true
@@ -214,7 +233,7 @@ function Invoke-SubModuloImpresoras {
         switch ($tecla) {
             '1' {
                 Clear-Host; Show-Banner
-                Write-Host "--- REINICIANDO COLA DE IMPRESIÓN ---" -ForegroundColor Cyan
+                Write-Host "--- REINICIANDO COLA DE IMPRESION ---" -ForegroundColor Cyan
                 if (-not (Test-IsAdmin)) { Write-Host "[ERROR] Se requieren privilegios de Administrador." -ForegroundColor Red; Wait-UserKeyPress; continue }
                 
                 Write-Host "Deteniendo servicio Spooler..." -ForegroundColor Yellow
@@ -222,7 +241,7 @@ function Invoke-SubModuloImpresoras {
                 Start-Sleep -Seconds 1
                 Write-Host "Iniciando servicio Spooler..." -ForegroundColor Yellow
                 Start-Service -Name Spooler
-                Write-Host "Servicio reiniciado con éxito." -ForegroundColor Green
+                Write-Host "Servicio reiniciado con exito." -ForegroundColor Green
                 Wait-UserKeyPress
             }
             '2' {
@@ -237,7 +256,7 @@ function Invoke-SubModuloImpresoras {
                 Remove-Item -Path $rutaSpool -Force -Recurse -ErrorAction SilentlyContinue
                 Write-Host "Iniciando Spooler nuevamente..." -ForegroundColor Yellow
                 Start-Service -Name Spooler
-                Write-Host "Cola de impresión limpia." -ForegroundColor Green
+                Write-Host "Cola de impresion limpia." -ForegroundColor Green
                 Wait-UserKeyPress
             }
             '3' {
@@ -260,49 +279,50 @@ function Invoke-SubModuloReparacion {
         switch ($tecla) {
             '1' {
                 Clear-Host; Show-Banner
-                Write-Host "--- REPARACIÓN DE SISTEMA (SFC) ---" -ForegroundColor Cyan
+                Write-Host "--- REPARACION DE SISTEMA (SFC) ---" -ForegroundColor Cyan
                 if (-not (Test-IsAdmin)) { Write-Host "[ERROR] Debes abrir Soptec como Administrador para esto." -ForegroundColor Red; Wait-UserKeyPress; continue }
-                Write-Host "Iniciando escaneo (Esto tomará varios minutos)..." -ForegroundColor Yellow
+                Write-Host "Iniciando escaneo (Esto tomara varios minutos)..." -ForegroundColor Yellow
                 sfc /scannow
                 Wait-UserKeyPress
             }
             '2' {
                 Clear-Host; Show-Banner
-                Write-Host "--- REPARACIÓN DE IMAGEN (DISM) ---" -ForegroundColor Cyan
+                Write-Host "--- REPARACION DE IMAGEN (DISM) ---" -ForegroundColor Cyan
                 if (-not (Test-IsAdmin)) { Write-Host "[ERROR] Debes abrir Soptec como Administrador para esto." -ForegroundColor Red; Wait-UserKeyPress; continue }
-                Write-Host "Iniciando restauración de imagen en línea..." -ForegroundColor Yellow
+                Write-Host "Iniciando restauracion de imagen en linea..." -ForegroundColor Yellow
                 DISM /Online /Cleanup-Image /RestoreHealth
                 Wait-UserKeyPress
             }
             '3' {
                 Clear-Host; Show-Banner
                 Write-Host "--- REPARAR MICROSOFT STORE ---" -ForegroundColor Cyan
-                Write-Host "Ejecutando WSReset. La tienda se abrirá automáticamente al terminar." -ForegroundColor Yellow
+                Write-Host "Ejecutando WSReset. La tienda se abrira automaticamente al terminar." -ForegroundColor Yellow
                 wsreset.exe
                 Wait-UserKeyPress
             }
             '4' {
                 Clear-Host; Show-Banner
                 Write-Host "--- RESETEAR ICONOS DEL ESCRITORIO ---" -ForegroundColor Cyan
-                Write-Host "El explorador de Windows se reiniciará. La pantalla puede parpadear." -ForegroundColor Yellow
+                Write-Host "El explorador de Windows se reiniciara. La pantalla puede parpadear." -ForegroundColor Yellow
                 Start-Sleep -Seconds 2
-                # Matamos el explorador, borramos la caché y lo revivimos
                 Stop-Process -Name explorer -Force
                 Remove-Item "$env:localappdata\IconCache.db" -Force -ErrorAction SilentlyContinue
                 Start-Process explorer
-                Write-Host "Caché de iconos borrada." -ForegroundColor Green
+                Write-Host "Cache de iconos borrada." -ForegroundColor Green
                 Wait-UserKeyPress
             }
             '5' { 
-                Invoke-SubModuloImpresoras # Llamada al tercer nivel de anidación
+                Invoke-SubModuloImpresoras 
             }
             '0' { $enMenuReparacion = $false }
         }
     }
 }
 
+
+
 # --------------------------------------------------------------------
-# CONTROLADOR PRINCIPAL
+# CONTROLADOR PRINCIPAL Y PUNTO DE ENTRADA (Main Entry Point)
 # --------------------------------------------------------------------
 $appCorriendo = $true
 [System.Console]::CursorVisible = $false 
@@ -314,17 +334,21 @@ while ($appCorriendo) {
     $tecla = [System.Console]::ReadKey($true).KeyChar.ToString().ToUpper()
 
     switch ($tecla) {
-        '1' { Invoke-SubModuloDiagnostico }
+        '1' { Invoke-SubModuloDiagnostico } 
         '2' { Invoke-SubModuloReparacion } 
-        '3' { Write-Host "Funcionalidad de Redes y Conectividad aún no implementada." -ForegroundColor Yellow; Wait-UserKeyPress }
+        '3' { 
+            Clear-Host; Show-Banner
+            Write-Host "Funcionalidad de Redes y Conectividad en construcción..." -ForegroundColor Yellow
+            Wait-UserKeyPress 
+        }
         
         { $_ -in 'S', [char]27 } { 
             Clear-Host
-            Write-Host "Cerrando programa." -ForegroundColor Green
+            Write-Host "Cerrando sistema GOLSYSTEMS. Hasta pronto!" -ForegroundColor Green
             $appCorriendo = $false 
         }
-        default { Write-Host "Opción no válida. Intenta de nuevo." -ForegroundColor Red; Wait-UserKeyPress }
     }
 }
 
+# Restaurar el entorno al usuario
 [System.Console]::CursorVisible = $true
